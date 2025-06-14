@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Sort Game</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+</head>
+<body>
+    <div id="game">
+        <div class="tube">
+            <div class="color yellow"></div>
+            <div class="color green"></div>
+            <div class="color yellow"></div>
+            <div class="color green"></div>
+        </div>
+        <div class="tube">
+            <div class="color green"></div>
+            <div class="color yellow"></div>
+            <div class="color green"></div>
+            <div class="color yellow"></div>
+        </div>
+        <div class="tube">
+            <div class=""></div>
+        </div>
+    </div>
+    <button id="resetBtn"><i class="fas fa-undo-alt"></i></button>
+
+    <script language="JavaScript">
+        const game = document.getElementById('game');
+        const resetBtn = document.getElementById('resetBtn');
+        let selectedTube = null;
+
+        const initialState = game.innerHTML;
+
+        function getColorClass(element) {
+            return Array.from(element.classList).find(cls => cls !== 'color');
+        }
+
+        function isWin() {
+            const tubes = document.querySelectorAll('.tube');
+            return Array.from(tubes).every(tube => {
+                const colors = Array.from(tube.querySelectorAll('.color'))
+                    .map(div => getColorClass(div));
+                return colors.length === 0 || colors.every(color => color === colors[0]);
+            });
+        }
+
+        function showStars() {
+            const defaults = {
+                spread: 360,
+                ticks: 100,
+                gravity: 0,
+                decay: 0.94,
+                startVelocity: 30,
+                shapes: ['star'],
+                colors: ['#ffdd00', '#ffd700', '#fff700']
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(200 * particleRatio)
+                }));
+            }
+
+            fire(0.25, { scalar: 1.2 });
+            fire(0.2, { scalar: 0.75 });
+            fire(0.35, { scalar: 1.0 });
+            fire(0.1, { scalar: 1.5 });
+            fire(0.1, { scalar: 0.5 });
+        }
+
+
+        function attachTubeListeners() {
+        const tubes = document.querySelectorAll('.tube');
+        tubes.forEach(tube => {
+            tube.addEventListener('click', () => {
+                if (selectedTube === null) {
+                    tube.classList.add('selected');
+                    selectedTube = tube;
+                } else if (selectedTube === tube) {
+                    tube.classList.remove('selected');
+                    selectedTube = null;
+                } else {
+                    const sourceColors = Array.from(selectedTube.querySelectorAll('.color'))
+                        .filter(color => getColorClass(color) !== undefined);
+                    if (sourceColors.length === 0) {
+                        selectedTube.classList.remove('selected');
+                        selectedTube = null;
+                        return;
+                    }
+                    
+                    const topSourceColor = sourceColors[sourceColors.length - 1];
+                    const targetColors = Array.from(tube.querySelectorAll('.color'))
+                        .filter(color => getColorClass(color) !== undefined);
+                    
+                    const topTargetColor = targetColors.length > 0 ? targetColors[targetColors.length - 1] : null;
+                    const sourceColorClass = getColorClass(topSourceColor);
+                    const targetColorClass = topTargetColor ? getColorClass(topTargetColor) : null;
+
+                    if (!topTargetColor || sourceColorClass === targetColorClass) {
+                        const sourceIndex = Array.from(tubes).indexOf(selectedTube);
+                        const targetIndex = Array.from(tubes).indexOf(tube);
+                        const isRight = targetIndex > sourceIndex;
+
+                        selectedTube.style.transform = isRight
+                            ? "rotate(20deg) translateY(-10px)"
+                            : "rotate(-20deg) translateY(-10px)";
+
+
+                        setTimeout(() => {
+                            selectedTube.removeChild(topSourceColor);
+                            tube.insertBefore(topSourceColor, tube.firstChild);
+
+                            selectedTube.classList.remove("selected");
+                            selectedTube.style.transform = "";
+                            selectedTube = null;
+
+                            if (isWin()) {
+                                showStars();
+                            }
+                        }, 300);
+                    } else {
+                        alert("Warnanya beda kocak, gak bisa");
+                    }
+                }
+            });
+        });
+        }
+
+        attachTubeListeners();
+
+        resetBtn.addEventListener('click', () => {
+            game.innerHTML = initialState;
+            selectedTube = null
+            attachTubeListeners();
+        });
+    </script>
+</body>
+</html>
