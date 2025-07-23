@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Sort Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="level-popup hidden" id="levelPopup">
+        <button class="level-btn" data-level="1">Level 1</button>
+        <button class="level-btn" data-level="2">Level 2</button>
+        <button class="level-btn" data-level="3">Level 3</button>
+        <button class="level-btn locked" disabled>Level 4</button>
+        <button class="level-btn locked" disabled>Level 5</button>
+        <button onclick="closeLevelPopup()">Tutup</button>
+    </div>
+
+    <div class="next-level-popup hidden" id="nextLevelPopup">
+        <div class="next-level-content">
+            <h2>Level Selesai!</h2>
+            <p id="winMessage">Selamat, Anda berhasil menyelesaikan level ini!</p>
+            <button id="backToMenuBtn" class="hidden">Back</button>
+            <button id="nextLevelBtn" class="hidden">Level Selanjutnya</button>
+            <button id="closeNextLevelPopupBtn">Tutup</button>
+        </div>
+    </div>
+
+    <div class="top-bar">
+        <span id="level-indicator">Level 3</span>
+        <button id="resetBtn"><i class="fas fa-undo-alt"></i></button>
+    </div>
+
+    <button id="levelBtn">Level</button>
+
+    <div id="game"></div>
+
+    <audio id="pourSound" src="pour.mp3"></audio>
+    <audio id="winSound" src="win.mp3"></audio>
+
+    <footer class="footer">
+        ©️ Druasoy
+    </footer>
+
+    <script>
+    // <![CDATA[
+        const levels = {
+            1: { tubes: [["sponc"], ["sponc"]], capacity: 2 },
+            2: { tubes: [["patpat", "squid", "patpat"], ["squid", "patpat", "squid"], [], []], capacity: 3 },
+            3: { tubes: [["patpat", "sponc", "patpat"], ["sponc", "patpat", "sponc"], [], []], capacity: 3 }
+        };
+
+        let currentLevel = 3;
+        const game = document.getElementById('game');
+        const resetBtn = document.getElementById('resetBtn');
+        const levelIndicator = document.getElementById('level-indicator');
+        const levelPopup = document.getElementById('levelPopup');
+        const levelBtn = document.getElementById('levelBtn');
+        const nextLevelPopup = document.getElementById('nextLevelPopup');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+        const closeNextLevelPopupBtn = document.getElementById('closeNextLevelPopupBtn');
+        const backToMenuBtn = document.getElementById('backToMenuBtn');
+        const winMessage = document.getElementById('winMessage');
+        
+        let selectedTube = null;
+        let currentMaxTubeCapacity = 0;
+
+        function getColorClass(element) {
+            return Array.from(element.classList).find(cls => !['color', 'color-empty', 'waving'].includes(cls));
+        }
+
+        function injectImagesToColors() {
+            const imageMap = { squid: 'images/squid.png', patpat: 'images/patpat.png', sponc: 'images/sponc.png' };
+            document.querySelectorAll('.color:not(.color-empty)').forEach(div => {
+                const colorClass = getColorClass(div);
+                if (imageMap[colorClass] && !div.querySelector('img')) {
+                    const img = document.createElement('img');
+                    img.src = imageMap[colorClass];
+                    img.alt = colorClass;
+                    img.classList.add('icon-img');
+                    div.appendChild(img);
+                }
+            });
+        }
+
+        function showStars() {
+            const defaults = { spread: 360, ticks: 100, gravity: 0, decay: 0.94, startVelocity: 30, shapes: ['star'], colors: ['#FFD700', '#FFDF00', '#FFFF00', '#FFFFFF'] };
+            confetti({ ...defaults, particleCount: 40, scalar: 1.2 });
+            confetti({ ...defaults, particleCount: 20, scalar: 0.75 });
+        }
+
+        function isTubeComplete(tube) {
+            const colors = Array.from(tube.querySelectorAll('.color:not(.color-empty)')).map(div => getColorClass(div));
+            if (colors.length === 0) return true;
+            const isFull = colors.length === currentMaxTubeCapacity;
+            const isHomogenous = colors.every(c => c === colors[0]);
+            return isFull && isHomogenous;
+        }
+
+        function checkWinCondition() {
+            if (Array.from(document.querySelectorAll('.tube')).every(isTubeComplete)) {
+                setTimeout(() => {
+                    document.getElementById("winSound").play();
+                    winMessage.textContent = "Selamat! Anda telah menyelesaikan semua level!";
+                    nextLevelBtn.classList.add('hidden');
+                    backToMenuBtn.classList.remove('hidden');
+                    nextLevelPopup.classList.remove("hidden");
+                }, 400);
+            }
+        }
+
+        function handleTubeClick() {
+            const clickedTube = this;
+            if (!selectedTube) {
+                if (clickedTube.querySelector('.color:not(.color-empty)')) {
+                    clickedTube.classList.add('selected');
+                    selectedTube = clickedTube;
+                }
+            } else if (selectedTube === clickedTube) {
+                clickedTube.classList.remove('selected');
+                selectedTube = null;
+            } else {
+                const sourceTube = selectedTube;
+                const targetTube = clickedTube;
+                const sourceColors = sourceTube.querySelectorAll('.color:not(.color-empty)');
+                const targetColors = targetTube.querySelectorAll('.color:not(.color-empty)');
+
+                if (sourceColors.length === 0) {
+                    selectedTube = null; return;
+                }
+
+                const topSourceColorDiv = sourceColors[sourceColors.length - 1];
+                const sourceColorClass = getColorClass(topSourceColorDiv);
+                const canPour = targetColors.length < currentMaxTubeCapacity && (targetColors.length === 0 || getColorClass(targetColors[targetColors.length - 1]) === sourceColorClass);
+
+                if (canPour) {
+                    document.getElementById("pourSound").play();
+                    sourceTube.classList.add(targetTube.getBoundingClientRect().left > sourceTube.getBoundingClientRect().left ? "pouring-right" : "pouring-left");
+                    setTimeout(() => {
+                        targetTube.appendChild(topSourceColorDiv);
+                        if (targetTube.querySelector('.color-empty')) {
+                            targetTube.removeChild(targetTube.querySelector('.color-empty'));
+                        }
+                        const emptyDiv = document.createElement("div");
+                        emptyDiv.classList.add("color-empty");
+                        sourceTube.insertBefore(emptyDiv, sourceTube.firstChild);
+                        sourceTube.classList.remove("selected", "pouring-right", "pouring-left");
+                        selectedTube = null;
+                        
+                        if (isTubeComplete(targetTube) && targetTube.querySelector('.color')) {
+                            showStars();
+                        }
+
+                        checkWinCondition();
+                    }, 300);
+                } else {
+                    sourceTube.classList.remove('selected');
+                    selectedTube = null;
+                }
+            }
+        }
+        
+        function attachTubeListeners() {
+            document.querySelectorAll('.tube').forEach(tube => tube.addEventListener('click', handleTubeClick));
+        }
+        
+        function renderLevel(level) {
+            game.innerHTML = '';
+            const levelData = levels[level];
+            currentMaxTubeCapacity = levelData.capacity;
+            levelIndicator.textContent = `Level ${level}`;
+            levelData.tubes.forEach(colors => {
+                const tube = document.createElement("div");
+                tube.classList.add("tube");
+                [...colors].reverse().forEach(color => {
+                    const div = document.createElement("div");
+                    div.classList.add("color", color);
+                    tube.appendChild(div);
+                });
+                while (tube.children.length < currentMaxTubeCapacity) {
+                    const emptyDiv = document.createElement("div");
+                    emptyDiv.classList.add("color-empty");
+                    tube.insertBefore(emptyDiv, tube.firstChild);
+                }
+                game.appendChild(tube);
+            });
+            attachTubeListeners();
+            injectImagesToColors();
+        }
+
+        levelBtn.onclick = () => levelPopup.classList.remove("hidden");
+        function closeLevelPopup() { levelPopup.classList.add("hidden"); }
+
+        document.querySelectorAll(".level-btn").forEach(btn => {
+            btn.onclick = () => {
+                const level = parseInt(btn.dataset.level);
+                if (!btn.disabled) {
+                    window.location.href = `level${level}.html`;
+                }
+            }
+        });
+
+        backToMenuBtn.addEventListener('click', () => {
+            window.location.href = 'home.html';
+        });
+
+        closeNextLevelPopupBtn.addEventListener('click', () => nextLevelPopup.classList.add("hidden"));
+        resetBtn.addEventListener('click', () => renderLevel(currentLevel));
+
+        renderLevel(currentLevel);
+    // ]]>
+    </script>
+</body>
+</html>
